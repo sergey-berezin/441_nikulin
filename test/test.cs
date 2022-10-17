@@ -1,8 +1,8 @@
-﻿using System;
+using System;
 using System.Diagnostics;
 using ArcFaceLibrary;
 
-namespace app
+namespace test
 {
   class Program
   {
