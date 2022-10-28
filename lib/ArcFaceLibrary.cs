@@ -259,7 +259,7 @@ namespace ArcFaceLibrary {
             smph.Release();
 
             if (ctn.IsCancellationRequested)
-                return new float[0];
+                return new float[0]; 
 
             return Normalize(results.First(v => v.Name == "fc1").AsEnumerable<float>().ToArray());
         }
