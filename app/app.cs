@@ -24,8 +24,8 @@ namespace app
               }
               var TArray = new Task[len/2];
               for (int i = 0; i < len-1; i+=2) {
-                string st1 = "images/" + args[i];
-                string st2 = "images/" + args[i+1];
+                string st1 = "../images/" + args[i];
+                string st2 = "../images/" + args[i+1];
                 TArray[i/2] = RunTask(st1, st2, cts);
               }
               await Task.WhenAll(TArray);
@@ -41,7 +41,7 @@ namespace app
       var input = new string[len] {"DiCaprio1.png", "DiCaprio2.png", "DuaLipa1.png", "DuaLipa2.png",
                                 "Obama1.png", "Obama2.png", "face1.png", "face2.png"};
       for (int i = 0; i < len; i++) {
-        input[i] = "images/" + input[i];
+        input[i] = "../images/" + input[i];
       }
 
       model = new ArcFace();
@@ -70,10 +70,10 @@ static async Task test2LinesOfImages (bool withCancel = false) {
       var input1 = new string[len1] {"DiCaprio1.png", "DuaLipa1.png", "Obama1.png", "face1.png"};
       var input2 = new string[len2] {"DiCaprio2.png", "DuaLipa2.png", "face2.png"};
       for (int i = 0; i < len1; i++) {
-        input1[i] = "images/" + input1[i];
+        input1[i] = "../images/" + input1[i];
       }
       for (int i = 0; i < len2; i++) {
-        input2[i] = "images/" + input2[i];
+        input2[i] = "../images/" + input2[i];
       }
 
       model = new ArcFace();
@@ -96,7 +96,7 @@ static async Task test2LinesOfImages (bool withCancel = false) {
       var input = new string[len] {"DiCaprio1.png", "DiCaprio2.png", "DuaLipa1.png", "DuaLipa2.png",
                                 "Obama1.png", "Obama2.png", "face1.png", "face2.png"};
       for (int i = 0; i < len; i++) {
-        input[i] = "images/" + input[i];
+        input[i] = "../images/" + input[i];
       }
       model = new ArcFace();
       var st = new Stopwatch();
