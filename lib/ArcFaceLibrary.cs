@@ -1,14 +1,11 @@
 ﻿// Download ONNX model from https://github.com/onnx/models/blob/main/vision/body_analysis/arcface/model/arcfaceresnet100-8.onnx
 // to project directory before run
 
-using System;
 using SixLabors.ImageSharp; // Из одноимённого пакета NuGet
 using SixLabors.ImageSharp.PixelFormats;
-using System.Linq;
 using SixLabors.ImageSharp.Processing;
 using Microsoft.ML.OnnxRuntime.Tensors;
 using Microsoft.ML.OnnxRuntime;
-using System.Collections.Generic;
 
 namespace ArcFaceLibrary {
     public class ArcFace
@@ -22,54 +19,37 @@ namespace ArcFaceLibrary {
                 modelStream.CopyTo(memoryStream);
             this.session = new InferenceSession(memoryStream.ToArray()); 
         }
+
+        public async Task<float[]> ProcessImage(byte[] image, CancellationToken ctn)
+        {
+            var imageStream = new MemoryStream(image);
+            var face = await Image.LoadAsync<Rgb24>(imageStream, ctn);
+
+            if (ctn.IsCancellationRequested)
+                return new float[0];
+
+            face.Mutate(ctx => {
+                ctx.Resize(new ResizeOptions
+                {
+                    Size = new Size(112, 112),
+                    Mode = ResizeMode.Crop
+                });
+            });
+
+            if (ctn.IsCancellationRequested)
+                return new float[0];
+
+            return await GetEmbeddingsAsync(face, ctn);
+        }
         public async Task<List<(string, float)>> ProcessAsync2imgs (byte[] img1, byte[] img2, CancellationToken ctn) 
         {
             if (ctn.IsCancellationRequested)
                 return new List<(string, float)>();
 
-            var t1 = Task<float[]>.Run (async () => {
-                var img1Stream = new MemoryStream(img1);
-                var face1 = await Image.LoadAsync<Rgb24>(img1Stream, ctn);
+            var task1 = ProcessImage(img1, ctn);
+            var task2 = ProcessImage(img2, ctn);
 
-                if (ctn.IsCancellationRequested)
-                    return new float[0];
-
-                face1.Mutate(ctx => {
-                ctx.Resize(new ResizeOptions 
-                            {
-                                Size = new Size(112, 112),
-                                Mode = ResizeMode.Crop
-                            });
-                });
-
-                if (ctn.IsCancellationRequested)
-                    return new float[0];
-
-                return await GetEmbeddingsAsync(face1, ctn);
-            }, ctn);
-
-            var t2 = Task<float[]>.Run (async () => {
-                var img2Stream = new MemoryStream(img2);
-                var face2 = await Image.LoadAsync<Rgb24>(img2Stream, ctn);
-
-                if (ctn.IsCancellationRequested)
-                    return new float[0];
-
-                face2.Mutate(ctx => {
-                ctx.Resize(new ResizeOptions 
-                            {
-                                Size = new Size(112, 112),
-                                Mode = ResizeMode.Crop
-                            });
-                });
-
-                if (ctn.IsCancellationRequested)
-                    return new float[0];
-
-                return await GetEmbeddingsAsync(face2, ctn);
-            }, ctn);
-
-            var res = await Task.WhenAll(t1, t2);
+            var res = await Task.WhenAll(task1, task2);
 
             if (ctn.IsCancellationRequested)
                 return new List<(string, float)>();
@@ -99,51 +79,12 @@ namespace ArcFaceLibrary {
             var Line2Vectors = new List<float[]>();
             Task<float[]>[] LineTasks = new Task<float[]>[n+m];
             for (int i = 0; i < n; i++) {
-                int local_i = i;
                 if (ctn.IsCancellationRequested)
                     return empty_arr;
-                LineTasks[i] = Task<float[]>.Run (async () => {
-                    var img1Stream = new MemoryStream(imgLine1[local_i]);
-                    var face1 = await Image.LoadAsync<Rgb24>(img1Stream, ctn);
-
-                    if (ctn.IsCancellationRequested)
-                        return new float[0];
-
-                    face1.Mutate(ctx => {
-                    ctx.Resize(new ResizeOptions 
-                                {
-                                    Size = new Size(112, 112),
-                                    Mode = ResizeMode.Crop
-                                });
-                    });
-
-                    if (ctn.IsCancellationRequested)
-                        return new float[0];
-
-                    return await GetEmbeddingsAsync(face1, ctn);
-                }, ctn);
+                LineTasks[i] = ProcessImage(imgLine1[i], ctn);
             }
             for (int j = 0; j < m; j++) {
-                int local_j = j;
-                LineTasks[n+j] = Task<float[]>.Run (async () => {
-                    var img2Stream = new MemoryStream(imgLine2[local_j]);
-                    var face2 = await Image.LoadAsync<Rgb24>(img2Stream, ctn);
-                    if (ctn.IsCancellationRequested)
-                        return new float[0];
-
-                    face2.Mutate(ctx => {
-                    ctx.Resize(new ResizeOptions 
-                                {
-                                    Size = new Size(112, 112),
-                                    Mode = ResizeMode.Crop
-                                });
-                    });
-
-                    if (ctn.IsCancellationRequested)
-                        return new float[0];
-
-                    return await GetEmbeddingsAsync(face2, ctn);
-                }, ctn);
+                LineTasks[n + j] = ProcessImage(imgLine2[j], ctn);
             }
             var res = await Task.WhenAll(LineTasks);
 
@@ -220,9 +161,9 @@ namespace ArcFaceLibrary {
             return v.Select(x => x / len).ToArray();
         }
 
-        float Distance(float[] v1, float[] v2) => Length(v1.Zip(v2).Select(p => p.First - p.Second).ToArray());
+        public float Distance(float[] v1, float[] v2) => Length(v1.Zip(v2).Select(p => p.First - p.Second).ToArray());
 
-        float Similarity(float[] v1, float[] v2) => v1.Zip(v2).Select(p => p.First * p.Second).Sum();
+        public float Similarity(float[] v1, float[] v2) => v1.Zip(v2).Select(p => p.First * p.Second).Sum();
 
         DenseTensor<float> ImageToTensor(Image<Rgb24> img)
         {
@@ -247,7 +188,7 @@ namespace ArcFaceLibrary {
             return t;
         }
 
-        async Task<float[]> GetEmbeddingsAsync(Image<Rgb24> face, CancellationToken ctn) 
+        public async Task<float[]> GetEmbeddingsAsync(Image<Rgb24> face, CancellationToken ctn) 
         {
             var inputs = new List<NamedOnnxValue> { NamedOnnxValue.CreateFromTensor("data", ImageToTensor(face)) };
 
