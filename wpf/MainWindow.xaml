@@ -7,10 +7,6 @@
         mc:Ignorable="d"
         Title="MainWindow" Height="450" Width="800">
 
-    <!--<Window.Resources>
-        <local:EightEmotions x:Key="key_EightEmotions"></local:EightEmotions>
-    </Window.Resources>-->
-
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="2*"/>
