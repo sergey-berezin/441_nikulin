@@ -218,7 +218,7 @@ namespace WPFLab
         private void UpdateSimilarityAndDistance(PhotosListItem item1, PhotosListItem item2)
         {
             Similarity.Text = MLModel.Similarity(item1.Embeddings, item2.Embeddings).ToString();
-            Distance.Text = MLModel.Distance(item1.Embeddings, item2.Embeddings).ToString(); // А если ещё не посчитались? Как делает кубик Рубика?
+            Distance.Text = MLModel.Distance(item1.Embeddings, item2.Embeddings).ToString();
         }
 
         private int List1SelectedIndex = -1;
