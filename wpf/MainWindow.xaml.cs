@@ -169,20 +169,21 @@ namespace WPFLab
 
         private async void DoDelete(object sender)
         {
-            PhotosListItem? item;
             bool isFirstList;
-            if (PhotosList1.SelectedItem != null)
+            PhotosListItem? item = null;
+            if (PhotosList1.SelectedIndex != -1)
             {
-                item = PhotosList1.SelectedItem as PhotosListItem;
                 isFirstList = true;
+                item = PhotosList1.SelectedItem as PhotosListItem;
             }
-            else
+            else if (PhotosList2.SelectedIndex != -1)
             {
-                item = PhotosList2.SelectedItem as PhotosListItem;
                 isFirstList = false;
+                item = PhotosList2.SelectedItem as PhotosListItem;
             }
             if (item == null)
             {
+                MessageBox.Show("No photo is selected to delete");
                 return;
             }
             try
@@ -193,26 +194,38 @@ namespace WPFLab
                     var photo = db.Photos.Where(record => record.PhotoId == item.PhotoId).Include(record => record.Details).First();
                     if (photo == null)
                     {
-                        dbSemaphore.Release();
                         return;
                     }
                     db.Details.Remove(photo.Details);
                     db.Photos.Remove(photo);
-                    db.SaveChanges();
-                    if (isFirstList)
+                    await db.SaveChangesAsync();
+                    var result1 = _PhotosList1.Where(record => record.PhotoId == item.PhotoId).ToList();
+                    if (result1.Count() > 0)
                     {
-                        _PhotosList1.Remove(item);
+                        _PhotosList1.Remove(result1[0]);
+                        if (_PhotosList1.Count() == 0)
+                        {
+                            List1ComputationStatus = EComputationStatus.kNotStarted;
+                        }
                     }
-                    else
+                    var result2 = _PhotosList2.Where(record => record.PhotoId == item.PhotoId).ToList();
+                    if (result2.Count() > 0)
                     {
-                        _PhotosList2.Remove(item);
+                        _PhotosList2.Remove(result2[0]);
+                        if (_PhotosList2.Count() == 0)
+                        {
+                            List2ComputationStatus = EComputationStatus.kNotStarted;
+                        }
                     }
-                    dbSemaphore.Release();
                 }
             }
             catch (Exception ex)
             {
                 MessageBox.Show(ex.Message);
+            }
+            finally
+            {
+                dbSemaphore.Release();
             }
         }
 
@@ -226,7 +239,7 @@ namespace WPFLab
             await AddImageToList(sender, /*isFirstList=*/false, e);
         }
 
-        private async Task<PhotosListItem> ProcessImage(string path, bool isFirstList)
+        private async Task<PhotosListItem?> ProcessImage(string path, bool isFirstList)
         {
             var pathSplit = path.Split("\\");
             var name = pathSplit.Last();
@@ -246,7 +259,7 @@ namespace WPFLab
                     {
                         item.Embeddings = maybePhoto[0].Embeddings;
                         dbSemaphore.Release();
-                        return item;
+                        return null;
                     }
                 }
 
@@ -404,9 +417,11 @@ namespace WPFLab
             {
 
                 var photos = db.Photos.Include(item => item.Details).ToList();
-                PhotosList1.ItemsSource = new ObservableCollection<PhotosListItem>(photos);
+                _PhotosList1 = new ObservableCollection<PhotosListItem>(photos);
+                PhotosList1.ItemsSource = _PhotosList1;
                 List1ComputationStatus = EComputationStatus.kCanClearList;
-                PhotosList2.ItemsSource = new ObservableCollection<PhotosListItem>(photos);
+                _PhotosList2 = new ObservableCollection<PhotosListItem>(photos);
+                PhotosList2.ItemsSource = _PhotosList2;
                 List2ComputationStatus = EComputationStatus.kCanClearList;
             }
         }
