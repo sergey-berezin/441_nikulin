@@ -28,6 +28,7 @@ namespace WPFLab
     public partial class MainWindow : Window, INotifyPropertyChanged
     {
         private ArcFace MLModel = new ArcFace();
+        private SemaphoreSlim GetPhotosSemaphore = new SemaphoreSlim(1, 1);
         private CancellationTokenSource cts = new CancellationTokenSource();
         public ICommand CancelCalculations { get; private set; }
         public ICommand ClearImages1 { get; private set; }
@@ -145,6 +146,7 @@ namespace WPFLab
         {
             try
             {
+                await GetPhotosSemaphore.WaitAsync();
                 var dialog = new Microsoft.Win32.OpenFileDialog();
                 dialog.Multiselect = true;
                 dialog.Filter = "Images (*.jpg, *.png)|*.jpg;*.png";
@@ -187,6 +189,10 @@ namespace WPFLab
                 cts.TryReset();
                 cts = new CancellationTokenSource();
                 MessageBox.Show(ex.Message);
+            }
+            finally
+            {
+                GetPhotosSemaphore.Release();
             }
         }
 
