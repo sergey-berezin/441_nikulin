@@ -63,10 +63,10 @@
         <TextBlock Name = "Similarity" Grid.Row="1" Grid.Column="2" ></TextBlock>
         <TextBlock Name = "Distance"  Grid.Row="1" Grid.Column="3" ></TextBlock>
 
-        <Button Content="Select 1st list of images" Name="FilePicker1" Click="GetPhotosList1" HorizontalAlignment="Center" 
+        <Button Content="Add image to the 1st list" Name="FilePicker1" Click="AddImageToList1" HorizontalAlignment="Center" 
                VerticalAlignment="Center"
                Padding="15" Grid.Row="2" Grid.ColumnSpan="2" Grid.Column="2" />
-        <Button Content="Select 2nd list of images" Name="FilePicker2" Click="GetPhotosList2" HorizontalAlignment="Center" VerticalAlignment="Center"
+        <Button Content="Add image to the 2nd list" Name="FilePicker2" Click="AddImageToList2" HorizontalAlignment="Center" VerticalAlignment="Center"
             Padding="15" Grid.Row="3" Grid.ColumnSpan="2" Grid.Column="2" />
         <Button Content="Clear 1st list" Padding="15" VerticalAlignment="Center" HorizontalAlignment="Center" 
                 Command="{Binding ClearImages1, UpdateSourceTrigger=PropertyChanged}"  Grid.Column="2" Grid.Row="4" Grid.ColumnSpan="2">
@@ -74,9 +74,12 @@
         <Button Content="Clear 2nd list" Padding="15" VerticalAlignment="Center" HorizontalAlignment="Center" 
                 Command="{Binding ClearImages2, UpdateSourceTrigger=PropertyChanged}"  Grid.Column="2" Grid.Row="5" Grid.ColumnSpan="2">
         </Button>
-        <Button Content="Stop Calculations" VerticalAlignment="Center" HorizontalAlignment="Center" 
+        <Button Content="Stop" VerticalAlignment="Center" HorizontalAlignment="Center" 
                 Padding="15"
-                Command="{Binding CancelCalculations}" Grid.Column="2" Grid.Row="6" Grid.ColumnSpan="2" />
+                Command="{Binding CancelCalculations}" Grid.Column="2" Grid.Row="6" />
+        <Button Content="Delete image" VerticalAlignment="Center" HorizontalAlignment="Center" 
+                Padding="15"
+                Command="{Binding DeleteImage}" Grid.Column="3" Grid.Row="6" />
 
         <ProgressBar Name="ProgressBar" Grid.Row="0" Grid.Column="4" Grid.RowSpan="7" Value="{Binding ProgressBarLevel}" Orientation="Vertical"
                      Margin="10,10,10,10" Minimum="0" Maximum="100"/>

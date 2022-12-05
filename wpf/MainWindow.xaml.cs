@@ -10,21 +10,17 @@ using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
+using Microsoft.EntityFrameworkCore;
+using System.ComponentModel.DataAnnotations.Schema;
+using System.ComponentModel.DataAnnotations;
+using System.Collections;
+using Microsoft.EntityFrameworkCore.ChangeTracking;
+using System.Linq.Expressions;
+using System.Collections.Generic;
+using static WPFLab.MainWindow;
 
 namespace WPFLab
 {
-    class PhotosListItem
-    {
-        public PhotosListItem(string otherName, string otherPath)
-        {
-            Name = otherName;
-            Path = otherPath;
-        }
-        public string Name { get; set; }
-        public string Path { get; set; }
-        public float[]? Embeddings { get; set; }
-    }
-
     public partial class MainWindow : Window, INotifyPropertyChanged
     {
         private ArcFace MLModel = new ArcFace();
@@ -33,6 +29,7 @@ namespace WPFLab
         public ICommand CancelCalculations { get; private set; }
         public ICommand ClearImages1 { get; private set; }
         public ICommand ClearImages2 { get; private set; }
+        public ICommand DeleteImage { get; private set; }
         public event PropertyChangedEventHandler? PropertyChanged;
 
         private int _ProgressBarLevel = 0;
@@ -48,6 +45,57 @@ namespace WPFLab
                 PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(ProgressBarLevel)));
             }
         }
+
+        public class PhotosListItem
+        {
+            [Key]
+            public int PhotoId { get; set; }
+            public string Name { get; set; }
+            public string Path { get; set; }
+            public int ImageHash { get; set; }
+            public PhotoDetails Details { get; set; }
+            public byte[] Embeddings { get; set; }
+            public void CreateHashCode(byte[] image)
+            {
+                ImageHash = image.Length;
+                foreach (int value in image)
+                {
+                    ImageHash = unchecked(ImageHash * 226817 + value);
+                }
+            }
+        }
+
+        private byte[] FloatsToBytes(float[] array)
+        {
+            var byteBuffer = new byte[array.Length * 4];
+            Buffer.BlockCopy(array, 0, byteBuffer, 0, byteBuffer.Length);
+            return byteBuffer;
+        }
+
+        private float[] BytesToFloats(byte[] bytes)
+        {
+            var floatBuffer = new float[bytes.Length / 4];
+            Buffer.BlockCopy(bytes, 0, floatBuffer, 0, bytes.Length);
+            return floatBuffer;
+        }
+
+        public class PhotoDetails
+        {
+            [Key]
+            [ForeignKey(nameof(PhotosListItem))]
+            public int PhotoId { get; set; }
+            public byte[] Blob { get; set; }
+        }
+
+        public class LibraryContext : DbContext
+        {
+            public DbSet<PhotosListItem> Photos { get; set; }
+            public DbSet<PhotoDetails> Details { get; set; }
+
+            protected override void OnConfiguring(DbContextOptionsBuilder o) =>
+                o.UseSqlite("Data Source=arcface.db");
+        }
+        private SemaphoreSlim dbSemaphore = new SemaphoreSlim(1, 1);
 
         public enum EComputationStatus
         {
@@ -114,35 +162,104 @@ namespace WPFLab
             ProgressBarLevel = 0;
         }
 
-        private async void GetPhotosList1(object sender, RoutedEventArgs? e = null)
+        private bool CanDelete(object sender)
         {
-            await GetPhotosList(sender, /*isFirstList=*/true, e);
+            return PhotosList1.SelectedItem != null || PhotosList2.SelectedItem != null;
         }
 
-        private async void GetPhotosList2(object sender, RoutedEventArgs? e = null)
+        private async void DoDelete(object sender)
         {
-            await GetPhotosList(sender, /*isFirstList=*/false, e);
-        }
-
-        private async Task ProcessImage(string path, bool isFirstList)
-        {
-            var pathSplit = path.Split("\\");
-            var name = pathSplit.Last();
-
-            var item = new PhotosListItem(name, path);
-            if (isFirstList)
+            PhotosListItem? item;
+            bool isFirstList;
+            if (PhotosList1.SelectedItem != null)
             {
-                _PhotosList1.Add(item);
+                item = PhotosList1.SelectedItem as PhotosListItem;
+                isFirstList = true;
             }
             else
             {
-                _PhotosList2.Add(item);
+                item = PhotosList2.SelectedItem as PhotosListItem;
+                isFirstList = false;
             }
-
-            var image = await File.ReadAllBytesAsync(path, cts.Token);
-            item.Embeddings = await MLModel.ProcessImage(image, cts.Token);
+            if (item == null)
+            {
+                return;
+            }
+            try
+            {
+                await dbSemaphore.WaitAsync();
+                using (var db = new LibraryContext())
+                {
+                    var photo = db.Photos.Where(record => record.PhotoId == item.PhotoId).Include(record => record.Details).First();
+                    if (photo == null)
+                    {
+                        dbSemaphore.Release();
+                        return;
+                    }
+                    db.Details.Remove(photo.Details);
+                    db.Photos.Remove(photo);
+                    db.SaveChanges();
+                    if (isFirstList)
+                    {
+                        _PhotosList1.Remove(item);
+                    }
+                    else
+                    {
+                        _PhotosList2.Remove(item);
+                    }
+                    dbSemaphore.Release();
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(ex.Message);
+            }
         }
-        private async Task GetPhotosList(object sender, bool isFirstList, RoutedEventArgs? e = null)
+
+        private async void AddImageToList1(object sender, RoutedEventArgs? e = null)
+        {
+            await AddImageToList(sender, /*isFirstList=*/true, e);
+        }
+
+        private async void AddImageToList2(object sender, RoutedEventArgs? e = null)
+        {
+            await AddImageToList(sender, /*isFirstList=*/false, e);
+        }
+
+        private async Task<PhotosListItem> ProcessImage(string path, bool isFirstList)
+        {
+            var pathSplit = path.Split("\\");
+            var name = pathSplit.Last();
+            var item = new PhotosListItem { Name = name, Path = path };
+            var image = await File.ReadAllBytesAsync(path, cts.Token);
+            item.CreateHashCode(image);
+
+            await dbSemaphore.WaitAsync();
+            using (var db = new LibraryContext())
+            {
+                item.Details = new PhotoDetails { Blob = image };
+                var maybePhoto = await db.Photos.Where(record => record.ImageHash == item.ImageHash).Take(1).
+                                            Include(record => record.Details).ToListAsync();
+                if (maybePhoto.Count == 1) // DB may contain the image
+                {
+                    if (Enumerable.SequenceEqual(item.Details.Blob, maybePhoto[0].Details.Blob)) // DB contains the image
+                    {
+                        item.Embeddings = maybePhoto[0].Embeddings;
+                        dbSemaphore.Release();
+                        return item;
+                    }
+                }
+
+                var floatEmbeddings = await MLModel.ProcessImage(image, cts.Token);
+                item.Embeddings = FloatsToBytes(floatEmbeddings);
+                await db.Photos.AddAsync(item);
+                await db.SaveChangesAsync();
+                dbSemaphore.Release();
+                return item;
+            }
+        }
+
+        private async Task AddImageToList(object sender, bool isFirstList, RoutedEventArgs? e = null)
         {
             try
             {
@@ -164,14 +281,35 @@ namespace WPFLab
                         List2ComputationStatus = EComputationStatus.kCanCancel;
                     }
                     ProgressBarLevel = 0;
-
                     ProgressBar.Maximum = dialog.FileNames.Length;
 
-                    foreach (var path in dialog.FileNames)
+                    var tasks = new Task[dialog.FileNames.Length];
+                    for (int i = 0; i < tasks.Length; ++i)
                     {
-                        await ProcessImage(path, isFirstList);
-                        ++ProgressBarLevel;
+                        var path = dialog.FileNames[i];
+                        tasks[i] = Task.Run(async () =>
+                        {
+                            var result = await ProcessImage(path, isFirstList);
+                            return result;
+                        }).ContinueWith(task =>
+                        {
+                            var result = task.Result;
+                            ++ProgressBarLevel;
+                            if (result != null)
+                            {
+                                if (isFirstList)
+                                {
+                                    _PhotosList1.Add(result);
+                                }
+                                else
+                                {
+                                    _PhotosList2.Add(result);
+                                }
+                            }
+                        }, TaskScheduler.FromCurrentSynchronizationContext());
                     }
+                    await Task.WhenAll(tasks);
+
                     if (isFirstList)
                     {
                         List1ComputationStatus = EComputationStatus.kCanClearList;
@@ -184,6 +322,10 @@ namespace WPFLab
             }
             catch (Exception ex)
             {
+                if (dbSemaphore.CurrentCount == 0)
+                {
+                    dbSemaphore.Release();
+                }
                 DoClear(this, true);
                 DoClear(this, false);
                 cts.TryReset();
@@ -219,12 +361,20 @@ namespace WPFLab
                 DoClear(this, false);
             }, CanClearList2
             );
+            DeleteImage = new RelayCommand(_ =>
+            {
+                DoDelete(this);
+            }, CanDelete
+            );
+            DownloadImagesFromDb();
         }
 
         private void UpdateSimilarityAndDistance(PhotosListItem item1, PhotosListItem item2)
         {
-            Similarity.Text = MLModel.Similarity(item1.Embeddings, item2.Embeddings).ToString();
-            Distance.Text = MLModel.Distance(item1.Embeddings, item2.Embeddings).ToString();
+            var embeddings1 = BytesToFloats(item1.Embeddings);
+            var embeddings2 = BytesToFloats(item2.Embeddings);
+            Similarity.Text = MLModel.Similarity(embeddings1, embeddings2).ToString();
+            Distance.Text = MLModel.Distance(embeddings1, embeddings2).ToString();
         }
 
         private int List1SelectedIndex = -1;
@@ -245,6 +395,19 @@ namespace WPFLab
             if (List1SelectedIndex != -1 && List2SelectedIndex != -1)
             {
                 UpdateSimilarityAndDistance(_PhotosList1[List1SelectedIndex], _PhotosList2[List2SelectedIndex]);
+            }
+        }
+
+        private void DownloadImagesFromDb()
+        {
+            using (var db = new LibraryContext())
+            {
+
+                var photos = db.Photos.Include(item => item.Details).ToList();
+                PhotosList1.ItemsSource = new ObservableCollection<PhotosListItem>(photos);
+                List1ComputationStatus = EComputationStatus.kCanClearList;
+                PhotosList2.ItemsSource = new ObservableCollection<PhotosListItem>(photos);
+                List2ComputationStatus = EComputationStatus.kCanClearList;
             }
         }
     }
