@@ -25,6 +25,7 @@ namespace WPFLab
     {
         private ArcFace MLModel = new ArcFace();
         private SemaphoreSlim GetPhotosSemaphore = new SemaphoreSlim(1, 1);
+        private SemaphoreSlim DeletePhotoSemaphore = new SemaphoreSlim(1, 1);
         private CancellationTokenSource cts = new CancellationTokenSource();
         public ICommand CancelCalculations { get; private set; }
         public ICommand ClearImages1 { get; private set; }
@@ -169,6 +170,7 @@ namespace WPFLab
 
         private async void DoDelete(object sender)
         {
+            await DeletePhotoSemaphore.WaitAsync();
             bool isFirstList;
             PhotosListItem? item = null;
             if (PhotosList1.SelectedIndex != -1)
@@ -184,6 +186,7 @@ namespace WPFLab
             if (item == null)
             {
                 MessageBox.Show("No photo is selected to delete");
+                DeletePhotoSemaphore.Release();
                 return;
             }
             try
@@ -226,6 +229,7 @@ namespace WPFLab
             finally
             {
                 dbSemaphore.Release();
+                DeletePhotoSemaphore.Release();
             }
         }
 
@@ -262,9 +266,10 @@ namespace WPFLab
                         return null;
                     }
                 }
-
+                dbSemaphore.Release();
                 var floatEmbeddings = await MLModel.ProcessImage(image, cts.Token);
                 item.Embeddings = FloatsToBytes(floatEmbeddings);
+                await dbSemaphore.WaitAsync();
                 await db.Photos.AddAsync(item);
                 await db.SaveChangesAsync();
                 dbSemaphore.Release();
