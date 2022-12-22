@@ -7,6 +7,10 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "ArcFaceLibrary", "lib\ArcFa
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "WPFLab", "wpf\WPFLab.csproj", "{8F5B1B2F-4EB5-48B9-96DB-261BAA0C8231}"
 EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Contracts", "Contracts\Contracts.csproj", "{5BE8C846-FA07-4ECA-9C94-113D4FC9099D}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Server", "Server\Server.csproj", "{6D5DB8BF-4EE7-42D8-9925-4B8BBD9B2EA1}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -21,6 +25,14 @@ Global
 		{8F5B1B2F-4EB5-48B9-96DB-261BAA0C8231}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{8F5B1B2F-4EB5-48B9-96DB-261BAA0C8231}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{8F5B1B2F-4EB5-48B9-96DB-261BAA0C8231}.Release|Any CPU.Build.0 = Release|Any CPU
+		{5BE8C846-FA07-4ECA-9C94-113D4FC9099D}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{5BE8C846-FA07-4ECA-9C94-113D4FC9099D}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{5BE8C846-FA07-4ECA-9C94-113D4FC9099D}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{5BE8C846-FA07-4ECA-9C94-113D4FC9099D}.Release|Any CPU.Build.0 = Release|Any CPU
+		{6D5DB8BF-4EE7-42D8-9925-4B8BBD9B2EA1}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{6D5DB8BF-4EE7-42D8-9925-4B8BBD9B2EA1}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{6D5DB8BF-4EE7-42D8-9925-4B8BBD9B2EA1}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{6D5DB8BF-4EE7-42D8-9925-4B8BBD9B2EA1}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

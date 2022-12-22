@@ -1,5 +1,4 @@
-﻿using ArcFaceLibrary;
-using EmotionsWPF;
+﻿using EmotionsWPF;
 using System;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
@@ -10,23 +9,33 @@ using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
-using Microsoft.EntityFrameworkCore;
 using System.ComponentModel.DataAnnotations.Schema;
 using System.ComponentModel.DataAnnotations;
 using System.Collections;
-using Microsoft.EntityFrameworkCore.ChangeTracking;
 using System.Linq.Expressions;
 using System.Collections.Generic;
 using static WPFLab.MainWindow;
+using Contracts;
+using System.Windows.Shapes;
+using System.Net.Http.Json;
+using System.Net.Http;
+using System.Net.Http.Headers;
+using System.Text.Json.Serialization;
+using Newtonsoft.Json;
+using System.Security.Policy;
+using System.Runtime.InteropServices;
+using Microsoft.EntityFrameworkCore.Metadata;
+using Polly.Retry;
+using Polly;
 
 namespace WPFLab
 {
     public partial class MainWindow : Window, INotifyPropertyChanged
     {
-        private ArcFace MLModel = new ArcFace();
-        private SemaphoreSlim GetPhotosSemaphore = new SemaphoreSlim(1, 1);
-        private SemaphoreSlim DeletePhotoSemaphore = new SemaphoreSlim(1, 1);
+        private const int Port = 7074;
         private CancellationTokenSource cts = new CancellationTokenSource();
+        private const int RetriesNumber = 5;
+        private readonly AsyncRetryPolicy _RetryPolicy;
         public ICommand CancelCalculations { get; private set; }
         public ICommand ClearImages1 { get; private set; }
         public ICommand ClearImages2 { get; private set; }
@@ -46,57 +55,6 @@ namespace WPFLab
                 PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(ProgressBarLevel)));
             }
         }
-
-        public class PhotosListItem
-        {
-            [Key]
-            public int PhotoId { get; set; }
-            public string Name { get; set; }
-            public string Path { get; set; }
-            public int ImageHash { get; set; }
-            public PhotoDetails Details { get; set; }
-            public byte[] Embeddings { get; set; }
-            public void CreateHashCode(byte[] image)
-            {
-                ImageHash = image.Length;
-                foreach (int value in image)
-                {
-                    ImageHash = unchecked(ImageHash * 226817 + value);
-                }
-            }
-        }
-
-        private byte[] FloatsToBytes(float[] array)
-        {
-            var byteBuffer = new byte[array.Length * 4];
-            Buffer.BlockCopy(array, 0, byteBuffer, 0, byteBuffer.Length);
-            return byteBuffer;
-        }
-
-        private float[] BytesToFloats(byte[] bytes)
-        {
-            var floatBuffer = new float[bytes.Length / 4];
-            Buffer.BlockCopy(bytes, 0, floatBuffer, 0, bytes.Length);
-            return floatBuffer;
-        }
-
-        public class PhotoDetails
-        {
-            [Key]
-            [ForeignKey(nameof(PhotosListItem))]
-            public int PhotoId { get; set; }
-            public byte[] Blob { get; set; }
-        }
-
-        public class LibraryContext : DbContext
-        {
-            public DbSet<PhotosListItem> Photos { get; set; }
-            public DbSet<PhotoDetails> Details { get; set; }
-
-            protected override void OnConfiguring(DbContextOptionsBuilder o) =>
-                o.UseSqlite("Data Source=arcface.db");
-        }
-        private SemaphoreSlim dbSemaphore = new SemaphoreSlim(1, 1);
 
         public enum EComputationStatus
         {
@@ -125,8 +83,8 @@ namespace WPFLab
             }
         }
 
-        private ObservableCollection<PhotosListItem> _PhotosList1 = new ObservableCollection<PhotosListItem>();
-        private ObservableCollection<PhotosListItem> _PhotosList2 = new ObservableCollection<PhotosListItem>();
+        private ObservableCollection<Photo> _PhotosList1 = new ObservableCollection<Photo>();
+        private ObservableCollection<Photo> _PhotosList2 = new ObservableCollection<Photo>();
 
         private bool CanCancel(object sender)
         {
@@ -150,16 +108,18 @@ namespace WPFLab
         {
             if (isFirstList)
             {
-                _PhotosList1 = new ObservableCollection<PhotosListItem>();
+                _PhotosList1 = new ObservableCollection<Photo>();
                 PhotosList1.ItemsSource = _PhotosList1;
                 List1ComputationStatus = EComputationStatus.kNotStarted;
             }
             else
             {
-                _PhotosList2 = new ObservableCollection<PhotosListItem>();
+                _PhotosList2 = new ObservableCollection<Photo>();
                 PhotosList2.ItemsSource = _PhotosList2;
                 List2ComputationStatus = EComputationStatus.kNotStarted;
             }
+            Similarity.Text = "";
+            Distance.Text = "";
             ProgressBarLevel = 0;
         }
 
@@ -170,66 +130,21 @@ namespace WPFLab
 
         private async void DoDelete(object sender)
         {
-            await DeletePhotoSemaphore.WaitAsync();
-            bool isFirstList;
-            PhotosListItem? item = null;
-            if (PhotosList1.SelectedIndex != -1)
-            {
-                isFirstList = true;
-                item = PhotosList1.SelectedItem as PhotosListItem;
-            }
-            else if (PhotosList2.SelectedIndex != -1)
-            {
-                isFirstList = false;
-                item = PhotosList2.SelectedItem as PhotosListItem;
-            }
-            if (item == null)
-            {
-                MessageBox.Show("No photo is selected to delete");
-                DeletePhotoSemaphore.Release();
-                return;
-            }
             try
             {
-                await dbSemaphore.WaitAsync();
-                using (var db = new LibraryContext())
+                var url = $"https://localhost:{Port}/images";
+                await _RetryPolicy.ExecuteAsync(async () =>
                 {
-                    var photo = db.Photos.Where(record => record.PhotoId == item.PhotoId).Include(record => record.Details).First();
-                    if (photo == null)
-                    {
-                        return;
-                    }
-                    db.Details.Remove(photo.Details);
-                    db.Photos.Remove(photo);
-                    await db.SaveChangesAsync();
-                    var result1 = _PhotosList1.Where(record => record.PhotoId == item.PhotoId).ToList();
-                    if (result1.Count() > 0)
-                    {
-                        _PhotosList1.Remove(result1[0]);
-                        if (_PhotosList1.Count() == 0)
-                        {
-                            List1ComputationStatus = EComputationStatus.kNotStarted;
-                        }
-                    }
-                    var result2 = _PhotosList2.Where(record => record.PhotoId == item.PhotoId).ToList();
-                    if (result2.Count() > 0)
-                    {
-                        _PhotosList2.Remove(result2[0]);
-                        if (_PhotosList2.Count() == 0)
-                        {
-                            List2ComputationStatus = EComputationStatus.kNotStarted;
-                        }
-                    }
-                }
+                    var httpClient = new HttpClient();
+                    var res = await httpClient.DeleteAsync(url);
+                    res.EnsureSuccessStatusCode();
+                    DoClear(sender, true);
+                    DoClear(sender, false);
+                });
             }
             catch (Exception ex)
             {
                 MessageBox.Show(ex.Message);
-            }
-            finally
-            {
-                dbSemaphore.Release();
-                DeletePhotoSemaphore.Release();
             }
         }
 
@@ -243,45 +158,10 @@ namespace WPFLab
             await AddImageToList(sender, /*isFirstList=*/false, e);
         }
 
-        private async Task<PhotosListItem?> ProcessImage(string path, bool isFirstList)
-        {
-            var pathSplit = path.Split("\\");
-            var name = pathSplit.Last();
-            var item = new PhotosListItem { Name = name, Path = path };
-            var image = await File.ReadAllBytesAsync(path, cts.Token);
-            item.CreateHashCode(image);
-
-            await dbSemaphore.WaitAsync();
-            using (var db = new LibraryContext())
-            {
-                item.Details = new PhotoDetails { Blob = image };
-                var maybePhoto = await db.Photos.Where(record => record.ImageHash == item.ImageHash).Take(1).
-                                            Include(record => record.Details).ToListAsync();
-                if (maybePhoto.Count == 1) // DB may contain the image
-                {
-                    if (Enumerable.SequenceEqual(item.Details.Blob, maybePhoto[0].Details.Blob)) // DB contains the image
-                    {
-                        item.Embeddings = maybePhoto[0].Embeddings;
-                        dbSemaphore.Release();
-                        return null;
-                    }
-                }
-                dbSemaphore.Release();
-                var floatEmbeddings = await MLModel.ProcessImage(image, cts.Token);
-                item.Embeddings = FloatsToBytes(floatEmbeddings);
-                await dbSemaphore.WaitAsync();
-                await db.Photos.AddAsync(item);
-                await db.SaveChangesAsync();
-                dbSemaphore.Release();
-                return item;
-            }
-        }
-
         private async Task AddImageToList(object sender, bool isFirstList, RoutedEventArgs? e = null)
         {
             try
             {
-                await GetPhotosSemaphore.WaitAsync();
                 var dialog = new Microsoft.Win32.OpenFileDialog();
                 dialog.Multiselect = true;
                 dialog.Filter = "Images (*.jpg, *.png)|*.jpg;*.png";
@@ -301,58 +181,62 @@ namespace WPFLab
                     ProgressBarLevel = 0;
                     ProgressBar.Maximum = dialog.FileNames.Length;
 
-                    var tasks = new Task[dialog.FileNames.Length];
-                    for (int i = 0; i < tasks.Length; ++i)
+                    var items = new Photo[dialog.FileNames.Length];
+
+                    for (int i = 0; i < items.Length; ++i)
                     {
                         var path = dialog.FileNames[i];
-                        tasks[i] = Task.Run(async () =>
-                        {
-                            var result = await ProcessImage(path, isFirstList);
-                            return result;
-                        }).ContinueWith(task =>
-                        {
-                            var result = task.Result;
-                            ++ProgressBarLevel;
-                            if (result != null)
-                            {
-                                if (isFirstList)
-                                {
-                                    _PhotosList1.Add(result);
-                                }
-                                else
-                                {
-                                    _PhotosList2.Add(result);
-                                }
-                            }
-                        }, TaskScheduler.FromCurrentSynchronizationContext());
+                        var name = dialog.FileNames[i].Split("\\").Last();
+                        items[i] = new Photo { Path = path, Name = name }; 
+                        var image = await File.ReadAllBytesAsync(path, cts.Token);
+                        items[i].CreateHashCode(image);
+                        items[i].Details = new PhotoDetails { Blob = image };
+                        items[i].Embeddings = new byte[0];
                     }
-                    await Task.WhenAll(tasks);
+                    var Ids = await _RetryPolicy.ExecuteAsync(async () =>
+                    {
+                        var httpClient = new HttpClient();
+                        httpClient.BaseAddress = new Uri($"https://localhost:{Port}/");
+                        httpClient.DefaultRequestHeaders.Accept.Clear();
+                        httpClient.DefaultRequestHeaders.Accept.Add(
+                            new MediaTypeWithQualityHeaderValue("application/json"));
+                        HttpResponseMessage resp = await HttpClientJsonExtensions.PostAsJsonAsync(httpClient, "images", items, cts.Token);
+                        resp.EnsureSuccessStatusCode();
+                        var Ids = await resp.Content.ReadFromJsonAsync<string[]>();
+                        return Ids;
+                    });
+                    for (int i = 0; i < Ids.Length; i++)
+                    {
+                        items[i].PhotoId = int.Parse(Ids[i]);
+                    }
+
+                    ProgressBarLevel = items.Length;
 
                     if (isFirstList)
                     {
+                        foreach (var item in items)
+                        {
+                            _PhotosList1.Add(item);
+                        }
                         List1ComputationStatus = EComputationStatus.kCanClearList;
                     }
                     else
                     {
+                        foreach (var item in items)
+                        {
+                            _PhotosList2.Add(item);
+                        }
                         List2ComputationStatus = EComputationStatus.kCanClearList;
                     }
                 }
             }
             catch (Exception ex)
             {
-                if (dbSemaphore.CurrentCount == 0)
-                {
-                    dbSemaphore.Release();
-                }
                 DoClear(this, true);
                 DoClear(this, false);
                 cts.TryReset();
                 cts = new CancellationTokenSource();
                 MessageBox.Show(ex.Message);
-            }
-            finally
-            {
-                GetPhotosSemaphore.Release();
             }
         }
 
@@ -384,15 +268,32 @@ namespace WPFLab
                 DoDelete(this);
             }, CanDelete
             );
-            DownloadImagesFromDb();
+            _RetryPolicy = Policy.Handle<HttpRequestException>().WaitAndRetryAsync(RetriesNumber, times =>
+                TimeSpan.FromMilliseconds(times * 500));
+            DownloadImages();
         }
 
-        private void UpdateSimilarityAndDistance(PhotosListItem item1, PhotosListItem item2)
+        private async void UpdateSimilarityAndDistance(Photo item1, Photo item2)
         {
-            var embeddings1 = BytesToFloats(item1.Embeddings);
-            var embeddings2 = BytesToFloats(item2.Embeddings);
-            Similarity.Text = MLModel.Similarity(embeddings1, embeddings2).ToString();
-            Distance.Text = MLModel.Distance(embeddings1, embeddings2).ToString();
+            try
+            {
+                await _RetryPolicy.ExecuteAsync(async () =>
+                {
+                    var httpClient = new HttpClient();
+                    var url = $"https://localhost:{Port}/compare";
+                    var id1 = item1.PhotoId;
+                    var id2 = item2.PhotoId;
+                    var response = await httpClient.GetAsync($"{url}/{id1}/{id2}");
+                    response.EnsureSuccessStatusCode();
+                    var result = await response.Content.ReadFromJsonAsync<double[]>();
+                    Distance.Text = "        " + string.Format("{0:f5}", result[0]);
+                    Similarity.Text = "        " + string.Format("{0:f5}", result[1]);
+                });
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(ex.Message);
+            }
         }
 
         private int List1SelectedIndex = -1;
@@ -416,18 +317,28 @@ namespace WPFLab
             }
         }
 
-        private void DownloadImagesFromDb()
+        private async void DownloadImages()
         {
-            using (var db = new LibraryContext())
+            try
             {
+                await _RetryPolicy.ExecuteAsync(async () =>
+                {
+                    var url = $"https://localhost:{Port}/images";
+                    var clientHttp = new HttpClient();
+                    var response = await clientHttp.GetAsync(url);
+                    var photos = await response.Content.ReadFromJsonAsync<Photo[]>();
 
-                var photos = db.Photos.Include(item => item.Details).ToList();
-                _PhotosList1 = new ObservableCollection<PhotosListItem>(photos);
-                PhotosList1.ItemsSource = _PhotosList1;
-                List1ComputationStatus = EComputationStatus.kCanClearList;
-                _PhotosList2 = new ObservableCollection<PhotosListItem>(photos);
-                PhotosList2.ItemsSource = _PhotosList2;
-                List2ComputationStatus = EComputationStatus.kCanClearList;
+                    _PhotosList1 = new ObservableCollection<Photo>(photos);
+                    PhotosList1.ItemsSource = _PhotosList1;
+                    List1ComputationStatus = EComputationStatus.kCanClearList;
+                    _PhotosList2 = new ObservableCollection<Photo>(photos);
+                    PhotosList2.ItemsSource = _PhotosList2;
+                    List2ComputationStatus = EComputationStatus.kCanClearList;
+                });
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(ex.Message);
             }
         }
     }
