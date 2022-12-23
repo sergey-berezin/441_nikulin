@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "WPFLab": {
+      "commandName": "Project",
+      "workingDirectory": "C:\\Dev\\Labs\\wpf"
+    }
+  }
+}

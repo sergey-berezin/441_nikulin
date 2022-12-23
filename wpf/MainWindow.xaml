@@ -33,7 +33,7 @@
                         <TextBlock HorizontalAlignment="Center" Text="{Binding Name}" Height="20"
                                      VerticalAlignment="Center">
                         </TextBlock>
-                        <Image HorizontalAlignment="Center" Source="{Binding Path}" Width="120" Height="100"
+                        <Image HorizontalAlignment="Center" Source="{Binding Details.Blob}" Width="120" Height="100"
                               VerticalAlignment="Center">
                         </Image>
                     </StackPanel>
@@ -48,7 +48,7 @@
                         <TextBlock HorizontalAlignment="Center" Text="{Binding Name}" Height="20"
                                      VerticalAlignment="Center">
                         </TextBlock>
-                        <Image HorizontalAlignment="Center" Source="{Binding Path}"  Width="120" Height="100"
+                        <Image HorizontalAlignment="Center" Source="{Binding Details.Blob}"  Width="120" Height="100"
                               VerticalAlignment="Center">
                         </Image>
                     </StackPanel>
@@ -60,8 +60,8 @@
 
         <Label Grid.Row="0" Grid.Column="3" FontSize="14" Content="Distance" FontWeight="Bold" HorizontalAlignment="Center" VerticalAlignment="Center" />
 
-        <TextBlock Name = "Similarity" Grid.Row="1" Grid.Column="2" ></TextBlock>
-        <TextBlock Name = "Distance"  Grid.Row="1" Grid.Column="3" ></TextBlock>
+        <TextBlock Name = "Similarity" Grid.Row="1" Grid.Column="2" FontSize="14" FontWeight="Bold" ></TextBlock>
+        <TextBlock Name = "Distance"  Grid.Row="1" Grid.Column="3" FontSize="14" FontWeight="Bold" ></TextBlock>
 
         <Button Content="Add image to the 1st list" Name="FilePicker1" Click="AddImageToList1" HorizontalAlignment="Center" 
                VerticalAlignment="Center"
@@ -77,7 +77,7 @@
         <Button Content="Stop" VerticalAlignment="Center" HorizontalAlignment="Center" 
                 Padding="15"
                 Command="{Binding CancelCalculations}" Grid.Column="2" Grid.Row="6" />
-        <Button Content="Delete image" VerticalAlignment="Center" HorizontalAlignment="Center" 
+        <Button Content="Delete images" VerticalAlignment="Center" HorizontalAlignment="Center" 
                 Padding="15"
                 Command="{Binding DeleteImage}" Grid.Column="3" Grid.Row="6" />
 
