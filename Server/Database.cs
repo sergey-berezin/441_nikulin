@@ -67,6 +67,7 @@ namespace Server.Database
 
                         var embedding = await MLModel.ProcessImage(image.Details.Blob, ct);
                         image.Embeddings = FloatsToBytes(embedding);
+                        image.CreateHashCode(image.Details.Blob);
                         db.Photos.Add(image);
                         await db.SaveChangesAsync();
                         var Id = db.Photos.Where(item => item.PhotoId == db.Photos.Max(item => item.PhotoId))

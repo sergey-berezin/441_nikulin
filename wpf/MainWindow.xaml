@@ -48,7 +48,7 @@
                         <TextBlock HorizontalAlignment="Center" Text="{Binding Name}" Height="20"
                                      VerticalAlignment="Center">
                         </TextBlock>
-                        <Image HorizontalAlignment="Center" Source="{Binding Path}"  Width="120" Height="100"
+                        <Image HorizontalAlignment="Center" Source="{Binding Details.Blob}"  Width="120" Height="100"
                               VerticalAlignment="Center">
                         </Image>
                     </StackPanel>
