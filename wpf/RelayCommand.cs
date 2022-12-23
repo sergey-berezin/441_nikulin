@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Windows.Input;
 
-namespace ArcFaceLibrary;
+namespace ArcFaceLibrary
 {
     class RelayCommand : ICommand
     {
