@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>web client</title>
+    <link href="cssStyles.css" rel="stylesheet"/>
+</head>
+<body>
+    <div class="init">
+        <div class="content">
+            <div class="list1">
+                <div class="listItem">
+                    Lorem ipsum dolor sit amet consectetur adipisicing elit. Quod accusantium similique dolorem delectus laboriosam magni!
+                    Lorem ipsum dolor, sit amet consectetur adipisicing elit. Cumque neque autem architecto at, deserunt molestias!
+                </div>
+                <div class="listItem">
+                    Lorem ipsum dolor sit amet consectetur adipisicing elit. Quod accusantium similique dolorem delectus laboriosam magni!
+                    Lorem ipsum dolor, sit amet consectetur adipisicing elit. Cumque neque autem architecto at, deserunt molestias!
+                </div>
+                <div class="listItem">
+                    Lorem ipsum dolor sit amet consectetur adipisicing elit. Quod accusantium similique dolorem delectus laboriosam magni!
+                    Lorem ipsum dolor, sit amet consectetur adipisicing elit. Cumque neque autem architecto at, deserunt molestias!
+                </div>
+                <div class="listItem">
+                    Lorem ipsum dolor sit amet consectetur adipisicing elit. Quod accusantium similique dolorem delectus laboriosam magni!
+                    Lorem ipsum dolor, sit amet consectetur adipisicing elit. Cumque neque autem architecto at, deserunt molestias!
+                </div>
+            </div>
+
+            <div class="list2">
+                <div class="listItem">
+                    Lorem ipsum dolor sit amet consectetur adipisicing elit. Quod accusantium similique dolorem delectus laboriosam magni!
+                    Lorem ipsum dolor, sit amet consectetur adipisicing elit. Cumque neque autem architecto at, deserunt molestias!
+                </div>
+                <div class="listItem">
+                    Lorem ipsum dolor sit amet consectetur adipisicing elit. Quod accusantium similique dolorem delectus laboriosam magni!
+                    Lorem ipsum dolor, sit amet consectetur adipisicing elit. Cumque neque autem architecto at, deserunt molestias!
+                </div>
+                <div class="listItem">
+                    Lorem ipsum dolor sit amet consectetur adipisicing elit. Quod accusantium similique dolorem delectus laboriosam magni!
+                    Lorem ipsum dolor, sit amet consectetur adipisicing elit. Cumque neque autem architecto at, deserunt molestias!
+                </div>
+            </div>
+            
+            <div class="elseInfo">
+                <div class="distanceSimilarity">
+                    <div class="Similarity">
+                        <div class="SimilarityTitle">
+                            Similarity
+                        </div>
+                        <div class="SimilarityBody">
+                            33.12123
+                        </div>
+                    </div>
+    
+                    <div class="Distance">
+                        <div class="DistanceTitle">
+                            Distance
+                        </div>
+                        <div class="DistanceBody">
+                            33.12123
+                        </div>
+                    </div>
+                </div>
+    
+                <div class="options">
+                    <div class="firstList">
+                        <div class="addTitle"> Add images to the 1st list</div>
+                        <input id="add1" class="filePicker"  type="file" id="file1" multiple="true">
+                    </div>
+                    <div class="secondList">
+                        <div class="addTitle"> Add images to the 2nd list</div>
+                        <input id="add2" class="filePicker" type="file" id="file1" multiple="true">
+                    </div>
+                    <input class="buttonClear" type="button" onclick="clearList1(this)" value="Clear 1st list">
+                    <input class="buttonClear" type="button" onclick="clearList2(this)" value="Clear 2nd list">
+                    <input class="buttonClear" type="button" onclick="deleteImages(this)" value="Delete images">
+                </div>
+            </div>
+        </div>
+    </div>
+    <script src="script.js"> </script>
+</body>
+</html>
